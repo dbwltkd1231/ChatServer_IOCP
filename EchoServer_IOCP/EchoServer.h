@@ -45,6 +45,7 @@ namespace Business
 	void ChatServer::Initialize(int portNum)
 	{
 		mDatabaseWorker.Initalize();
+		mDatabaseWorker.DataLoadAsync();
 
 		auto receiveCallback = std::function<void(std::shared_ptr<IOCP::CustomOverlapped>)>(
 			std::bind(&ChatServer::Read, this, std::placeholders::_1)
