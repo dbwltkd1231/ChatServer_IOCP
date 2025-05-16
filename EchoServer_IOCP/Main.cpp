@@ -14,7 +14,7 @@
 
 int main()
 {
-	Business::EchoServer echoServer;
+	Business::ChatServer echoServer;
 	echoServer.Initialize(MY_PORT_NUM);
 	echoServer.Work();
 }

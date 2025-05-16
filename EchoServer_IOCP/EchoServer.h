@@ -14,13 +14,14 @@
 #include "LockFreeCircleQueue.h"
 #include "Network.h"
 #include "Protocol.h"
+#include "DatabaseWorker.h"
 
 #include "flatbuffers/flatbuffers.h"
 #include"MESSAGE_WRAPPER_generated.h"
 
 namespace Business
 {
-	class EchoServer
+	class ChatServer
 	{
 	public:
 		void Initialize(int portNum);
@@ -30,6 +31,7 @@ namespace Business
 		IOCP::Network network;
 		bool mServerOn;
 		std::thread mWorkThread;
+		Business::DatabaseWorker mDatabaseWorker;
 
 		tbb::concurrent_map<int, std::shared_ptr<IOCP::Client>> mID_ClientMap; // connectID로 관리되는 클라이언트
 
@@ -40,10 +42,12 @@ namespace Business
 
 	};
 
-	void EchoServer::Initialize(int portNum)
+	void ChatServer::Initialize(int portNum)
 	{
+		mDatabaseWorker.Initalize();
+
 		auto receiveCallback = std::function<void(std::shared_ptr<IOCP::CustomOverlapped>)>(
-			std::bind(&EchoServer::Read, this, std::placeholders::_1)
+			std::bind(&ChatServer::Read, this, std::placeholders::_1)
 		);
 
 		network.Initialize(portNum, clientMax, contextMax, receiveCallback);
@@ -52,16 +56,16 @@ namespace Business
 		mServerOn = true;
 	}
 
-	void EchoServer::Work()
+	void ChatServer::Work()
 	{
-		mWorkThread = std::thread(&EchoServer::Process, this);
+		mWorkThread = std::thread(&ChatServer::Process, this);
 		if (mWorkThread.joinable())
 		{
 			mWorkThread.join();
 		}
 	}
 
-	void EchoServer::Process()
+	void ChatServer::Process()
 	{
 		while (true)//mServerOn
 		{
@@ -69,7 +73,7 @@ namespace Business
 		}
 	}
 
-	void EchoServer::Read(std::shared_ptr<IOCP::CustomOverlapped> context)//복사본으로 전달
+	void ChatServer::Read(std::shared_ptr<IOCP::CustomOverlapped> context)//복사본으로 전달
 	{
 		int socket_id = context->header->socket_id;//completion key
 		auto request_body_size = ntohl(context->header->body_size);
