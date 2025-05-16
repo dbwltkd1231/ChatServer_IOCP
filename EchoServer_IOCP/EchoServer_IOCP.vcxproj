@@ -71,8 +71,8 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>C:\Users\sajang\source\repos\C++\EchoServer_IOCP\include\oneTBB\include;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Users\sajang\source\repos\C++\EchoServer_IOCP\x64\libs;C:\Users\sajang\source\repos\C++\EchoServer_IOCP\include\oneTBB\lib\intel64\vc14;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\sajang\source\repos\C++\EchoServer_IOCP\include\oneTBB\include;C:\Users\sajang\source\repos\C++\EchoServer_IOCP\EchoServer_IOCP\hiredis;C:\Users\sajang\source\repos\C++\EchoServer_IOCP\include\nlohmann;$(IncludePath)</IncludePath>
+    <LibraryPath>C:\Users\sajang\source\repos\C++\EchoServer_IOCP\x64\libs;C:\Users\sajang\source\repos\C++\EchoServer_IOCP\include\oneTBB\lib\intel64\vc14;C:\Users\sajang\source\repos\C++\EchoServer_IOCP\EchoServer_IOCP\hiredis\Release;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClInclude Include="Client.h" />
     <ClInclude Include="DatabaseWorker.h" />
+    <ClInclude Include="DataStruct.h" />
     <ClInclude Include="EchoServer.h" />
     <ClInclude Include="LockFreeCircleQueue.h" />
     <ClInclude Include="Protocol.h" />

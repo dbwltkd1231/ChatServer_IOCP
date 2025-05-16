@@ -2,48 +2,48 @@
 
 namespace Business  
 {  
-   void DatabaseWorker::Initalize()  
-   {  
-       SQLWCHAR sqlState[6], message[256];
-       SQLINTEGER nativeError;
-       SQLSMALLINT messageLength;
+    void DatabaseWorker::Initalize()
+    {
+        SQLWCHAR sqlState[6], message[256];
+        SQLINTEGER nativeError;
+        SQLSMALLINT messageLength;
 
-       SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &mHenv);
+        SQLRETURN ret = SQLAllocHandle(SQL_HANDLE_ENV, SQL_NULL_HANDLE, &mHenv);
 
-      //ODBC 버전 설정
-      ret = SQLSetEnvAttr(mHenv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
-    
-      if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-          SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
-          std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
-          return;
-      }
-      std::cout << "MSSQL Connect-4 Success" << std::endl;
-    
-       //연결 핸들 생성
-       ret = SQLAllocHandle(SQL_HANDLE_DBC, mHenv, &mHdbc);
-     
-       if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-           SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
-           std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
-           return;
-       }
-       std::cout << "MSSQL Connect-3 Success" << std::endl;
+        //ODBC 버전 설정
+        ret = SQLSetEnvAttr(mHenv, SQL_ATTR_ODBC_VERSION, (void*)SQL_OV_ODBC3, 0);
 
-       //연결 문자열 생성
-       //SQLWCHAR* connStr = (SQLWCHAR*)L"DRIVER={SQL Server};SERVER=DESKTOP-O5SU309\\SQLEXPRESS;DATABASE=MyChatServer;UID=sa;PWD=5760;";  -> windows인증일땐 사용하지않는다.
-       SQLWCHAR* connStr = (SQLWCHAR*)L"DRIVER={SQL Server};SERVER=DESKTOP-O5SU309\\SQLEXPRESS;DATABASE=MyChat;Trusted_Connection=yes;";
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
+            std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
+            return;
+        }
+        std::cout << "MSSQL Connect-4 Success" << std::endl;
 
-       
-       //DB에 연결
-       //->UNICODE 버전
-       ret = SQLDriverConnectW(mHdbc, NULL, connStr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_COMPLETE);
-       if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
-       {
-           SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
-           std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
-           return;
-       }
+        //연결 핸들 생성
+        ret = SQLAllocHandle(SQL_HANDLE_DBC, mHenv, &mHdbc);
+
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
+            std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
+            return;
+        }
+        std::cout << "MSSQL Connect-3 Success" << std::endl;
+
+        //연결 문자열 생성
+        //SQLWCHAR* connStr = (SQLWCHAR*)L"DRIVER={SQL Server};SERVER=DESKTOP-O5SU309\\SQLEXPRESS;DATABASE=MyChatServer;UID=sa;PWD=5760;";  -> windows인증일땐 사용하지않는다.
+        SQLWCHAR* connStr = (SQLWCHAR*)L"DRIVER={SQL Server};SERVER=DESKTOP-O5SU309\\SQLEXPRESS;DATABASE=MyChat;Trusted_Connection=yes;";
+
+
+        //DB에 연결
+        //->UNICODE 버전
+        ret = SQLDriverConnectW(mHdbc, NULL, connStr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_COMPLETE);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO)
+        {
+            SQLGetDiagRecW(SQL_HANDLE_DBC, mHdbc, 1, sqlState, &nativeError, message, sizeof(message), &messageLength);
+            std::wcout << L"ODBC 오류 발생: " << message << L" (SQLState: " << sqlState << L")\n";
+            return;
+        }
 
         // ->>ANSI버전
         //  if (SQLDriverConnect(mHdbc, NULL, connStr, SQL_NTS, NULL, 0, NULL, SQL_DRIVER_NOPROMPT) == SQL_SUCCESS) {  
@@ -61,17 +61,24 @@ namespace Business
 
 
      //쿼리 실행을 위한 문장 핸들 생성
-     ret = SQLAllocHandle(SQL_HANDLE_STMT, mHdbc, &mHstmt);
-     if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
-         std::cout << "ODBC 오류 발생" << std::endl;
-         return;
-     }
+        ret = SQLAllocHandle(SQL_HANDLE_STMT, mHdbc, &mHstmt);
+        if (ret != SQL_SUCCESS && ret != SQL_SUCCESS_WITH_INFO) {
+            std::cout << "ODBC 오류 발생" << std::endl;
+            return;
+        }
 
-     std::cout << "MSSQL Connect Success" << std::endl;
-   }  
+        std::cout << "MSSQL Connect Success" << std::endl;
+
+        mTableMap = {
+                    {"Messages", TableType::Messages},
+                    {"Users", TableType::Users}
+                    };
+    }
 
    void DatabaseWorker::Deinitalize()  
    {  
+       redisFree(mRedis); // 연결 해제
+
        // 연결 종료  
        SQLFreeHandle(SQL_HANDLE_STMT, mHstmt);
        SQLDisconnect(mHdbc);
@@ -79,8 +86,18 @@ namespace Business
        SQLFreeHandle(SQL_HANDLE_ENV, mHenv);
    }  
 
-   bool DatabaseWorker::DataLoadAsync()
+   bool DatabaseWorker::DataLoadAsync(std::string ip, int port)
    {
+       //이코드 실행전 Redis 서버 실행 필요
+       mRedis = redisConnect(ip.c_str(), port);
+       if (mRedis == NULL || mRedis->err)
+       {
+           std::cout << "Redis 연결 실패!" << std::endl;
+           return false;
+       }
+       std::cout << "Redis 연결 성공!" << std::endl;
+
+
        SQLWCHAR* tableQuery = (SQLWCHAR*)L"SELECT TABLE_NAME FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_CATALOG = 'MyChat';";
        SQLRETURN ret = SQLExecDirectW(mHstmt, tableQuery, SQL_NTS);
 
@@ -105,8 +122,100 @@ namespace Business
  
        for (auto table : mTableNameSet)
        {
+   
            SQLFreeStmt(mHstmt, SQL_CLOSE); // 이전 쿼리 결과 닫기
-           std::cout << "테이블 이름: " << table << std::endl;
+           auto tableType = getTableType(table);
+
+           switch(tableType)
+           {
+           case TableType::Unknown:
+           {
+               std::cout << "Unknown" << std::endl;
+               break;
+           }
+           case TableType::Users:
+           {
+               std::cout << "Users" << std::endl;
+
+               std::wstring queryStr = L"SELECT id, password, created_at FROM " + std::wstring(table.begin(), table.end());
+               SQLWCHAR* dataQuery = (SQLWCHAR*)queryStr.c_str();
+               SQLRETURN dataRet = SQLExecDirectW(mHstmt, dataQuery, SQL_NTS);
+
+               if (dataRet == SQL_SUCCESS || dataRet == SQL_SUCCESS_WITH_INFO)
+               {
+                   SQLWCHAR id[16];
+                   SQLWCHAR password[50];
+                   long long created_at;
+
+                   while (SQLFetch(mHstmt) == SQL_SUCCESS)
+                   {
+                       SQLGetData(mHstmt, 1, SQL_C_LONG, &id, 0, NULL);
+                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, password, sizeof(password), NULL);
+                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &created_at, 0, NULL);
+
+                       Business::Data_User user{
+                          StringConvert(std::wstring(id)),
+                          StringConvert(std::wstring(password)),
+                          std::chrono::system_clock::time_point(std::chrono::seconds(created_at))
+                       };
+
+                       std::string jsonData = user.toJson();
+                       redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
+                       freeReplyObject(reply);
+
+                       std::cout << user.id << std::endl;
+                   }
+               }
+
+               break;
+           }
+           case TableType::Messages:
+           {
+               std::cout << "Messages" << std::endl;
+               std::wstring queryStr = L"SELECT id, sender_id, receiver_id, message, timestamp FROM " + std::wstring(table.begin(), table.end());
+               SQLWCHAR* dataQuery = (SQLWCHAR*)queryStr.c_str();
+
+               SQLRETURN dataRet = SQLExecDirectW(mHstmt, dataQuery, SQL_NTS);
+               if (dataRet == SQL_SUCCESS || dataRet == SQL_SUCCESS_WITH_INFO)
+               {
+                   int id;
+                   SQLWCHAR sender_id[16];
+                   SQLWCHAR receiver_id[256];
+                   SQLWCHAR message[1024];
+                   long long timestamp;
+
+                   while (SQLFetch(mHstmt) == SQL_SUCCESS)
+                   {
+                       SQLGetData(mHstmt, 1, SQL_C_LONG, &id, 0, NULL);
+                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, sender_id, sizeof(sender_id), NULL);
+                       SQLGetData(mHstmt, 3, SQL_C_WCHAR, receiver_id, sizeof(receiver_id), NULL);
+                       SQLGetData(mHstmt, 4, SQL_C_WCHAR, message, sizeof(message), NULL);
+                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &timestamp, 0, NULL);
+
+                       Business::Data_Message messages{
+                           id,
+                           StringConvert(std::wstring(sender_id)),
+                           StringConvert(std::wstring(receiver_id)),
+                           StringConvert(std::wstring(message)),
+                           std::chrono::system_clock::time_point(std::chrono::seconds(timestamp))
+                       };
+
+                       std::string jsonData = messages.toJson();
+                       redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", messages.sender_id.c_str(), jsonData.c_str());
+                       freeReplyObject(reply);
+
+                       std::cout << messages.sender_id << std::endl;
+                   }
+               }
+               break;
+           }
+           default:
+               break;
+           }
+
+           SQLFreeStmt(mHstmt, SQL_CLOSE); // 이전 쿼리 결과 닫기
+
+           /*
            std::wstring queryStr = L"SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + std::wstring(table.begin(), table.end()) + L"'";
 
            SQLWCHAR* columnsQuery = (SQLWCHAR*)queryStr.c_str();
@@ -125,9 +234,16 @@ namespace Business
            {
                std::cout << table << " 정보 가져오기 실패";
            }
+           */
        }
 
        return true;
+   }
+
+   TableType DatabaseWorker::getTableType(const std::string& table)
+   {
+       auto it = mTableMap.find(table);
+       return (it != mTableMap.end()) ? it->second : TableType::Unknown;
    }
 
    std::string DatabaseWorker::StringConvert(std::wstring ws)

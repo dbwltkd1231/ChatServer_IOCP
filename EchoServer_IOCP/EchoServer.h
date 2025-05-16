@@ -24,7 +24,7 @@ namespace Business
 	class ChatServer
 	{
 	public:
-		void Initialize(int portNum);
+		void Initialize(std::string ip, int serverPortNum, int redisPortNum);
 		void Work();
 		void Read(std::shared_ptr<IOCP::CustomOverlapped> context);
 	private:
@@ -39,19 +39,18 @@ namespace Business
 		constexpr static int contextMax = 10;//200
 
 		void Process();
-
 	};
 
-	void ChatServer::Initialize(int portNum)
+	void ChatServer::Initialize(std::string ip, int serverPortNum, int redisPortNum)
 	{
 		mDatabaseWorker.Initalize();
-		mDatabaseWorker.DataLoadAsync();
+		mDatabaseWorker.DataLoadAsync(ip, redisPortNum);
 
 		auto receiveCallback = std::function<void(std::shared_ptr<IOCP::CustomOverlapped>)>(
 			std::bind(&ChatServer::Read, this, std::placeholders::_1)
 		);
 
-		network.Initialize(portNum, clientMax, contextMax, receiveCallback);
+		network.Initialize(serverPortNum, clientMax, contextMax, receiveCallback);
 		network.SocketAccept();
 
 		mServerOn = true;

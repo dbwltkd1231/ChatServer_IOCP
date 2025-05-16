@@ -56,5 +56,8 @@
     <ClInclude Include="DatabaseWorker.h">
       <Filter>헤더 파일\Business</Filter>
     </ClInclude>
+    <ClInclude Include="DataStruct.h">
+      <Filter>헤더 파일\Business</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>
