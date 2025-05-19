@@ -17,13 +17,13 @@ namespace Business
    {  
        std::string id;  // varchar(16)  
        std::string password;  // varchar(50)  
-       std::chrono::system_clock::time_point created_at; // datetime  
+       long long created_at; // datetime  
        
        std::string toJson() const {  
            nlohmann::json j; // Ensure the nlohmann namespace is correctly resolved  
            j["id"] = id;  
            j["password"] = password;  
-           j["created_at"] = std::chrono::duration_cast<std::chrono::seconds>(created_at.time_since_epoch()).count();  
+           j["created_at"] = created_at;
            return j.dump();  
        }  
 
@@ -38,7 +38,9 @@ namespace Business
        std::string sender_id; // varchar(16)  
        std::string receiver_id;  // varchar(16)  
        std::string message;  // text
-       std::chrono::system_clock::time_point timestamp; // datetime  
+       //std::ostringstream timestamp; // SQL의 datetime형식 ->  TIMESTAMP_STRUCT 구조체로 변환해서 사용-> json형태로 저장하기 위해 ISO 8601 형식 문자열로 변환 후 저장
+       long long timestamp; // SQL의 datetime형식 ->  TIMESTAMP_STRUCT 구조체로 변환해서 사용-> json형태로 저장하기 위해 ISO 8601 형식 문자열로 변환 후 저장
+  
 
        std::string toJson() const {  
            nlohmann::json j; // Ensure the nlohmann namespace is correctly resolved  
@@ -46,7 +48,7 @@ namespace Business
            j["sender_id"] = sender_id;  
            j["receiver_id"] = receiver_id;  
            j["message"] = message;  
-           j["timestamp"] = std::chrono::duration_cast<std::chrono::seconds>(timestamp.time_since_epoch()).count();  
+           j["timestamp"] = timestamp;
            return j.dump();  
        }  
    };  

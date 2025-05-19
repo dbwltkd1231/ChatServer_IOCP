@@ -149,27 +149,30 @@ namespace Business
                {
                    SQLWCHAR id[16];
                    SQLWCHAR password[50];
-                   long long created_at;
+                   TIMESTAMP_STRUCT created_at;
 
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
                    {
                        SQLGetData(mHstmt, 1, SQL_C_WCHAR, &id, sizeof(id), NULL);
                        SQLGetData(mHstmt, 2, SQL_C_WCHAR, password, sizeof(password), NULL);
-                       SQLGetData(mHstmt, 3, SQL_C_SBIGINT, &created_at, sizeof(created_at), NULL);
+                       SQLGetData(mHstmt, 3, SQL_C_TYPE_TIMESTAMP, &created_at, sizeof(TIMESTAMP_STRUCT), NULL);
+
+
+                       std::tm timeinfo = { created_at.second, created_at.minute, created_at.hour, created_at.day, created_at.month - 1, created_at.year - 1900 };
+
+                       std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
+                       std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
                        Business::Data_User user{
                           StringConvert(std::wstring(id)),
                           StringConvert(std::wstring(password)),
-                          std::chrono::system_clock::time_point(std::chrono::seconds(created_at))
+                          utcTime
                        };
 
-                    //  std::string jsonData = user.toJson();
-                    //  redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
-                    //  freeReplyObject(reply);
+                      // std::string jsonData = user.toJson();
+                      // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
+                      // freeReplyObject(reply);
 
-                       std::cout << user.id << std::endl;
-                       std::cout << user.password << std::endl;
-                       std::cout << user.created_at << std::endl;
                    }
                }
 
@@ -187,48 +190,43 @@ namespace Business
                    int id;
                    SQLWCHAR sender_id[16];
                    SQLWCHAR receiver_id[16];
-                   SQLWCHAR message[2048]; //- SQL_C_WCHAR은 UTF-16을 읽는 방식이므로, 만약 데이터가 UTF-8d이면 깨질수있다.
-                   //SQL_C_WCHAR message[2048];//SQL_C_WCHAR은 UTF-16을 읽는방식.
-                   long long timestamp;
+                   //SQLWCHAR message[2048]; //- SQL_C_WCHAR은 UTF-16을 읽는 방식이므로, 만약 데이터가 UTF-8d이면 깨질수있다.
+                   SQLCHAR message[2048];//SQL_C_WCHAR은 UTF-16을 읽는방식.
+                   TIMESTAMP_STRUCT timestamp;
 
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
                    {
                        SQLGetData(mHstmt, 1, SQL_C_LONG, &id, 0, NULL);
                        SQLGetData(mHstmt, 2, SQL_C_WCHAR, &sender_id, sizeof(sender_id), NULL);
                        SQLGetData(mHstmt, 3, SQL_C_WCHAR, &receiver_id, sizeof(receiver_id), NULL);
-                       SQLGetData(mHstmt, 4, SQL_C_CHAR, message, sizeof(message), NULL);//SQL_C_CHAR
-                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &timestamp, sizeof(timestamp), NULL);
 
-                       // EUC-KR → UTF-8 변환
-                       int euckr_size = MultiByteToWideChar(949, 0, (char*)message, -1, nullptr, 0);
-                       std::wstring wmessage(euckr_size, 0);
-                       MultiByteToWideChar(949, 0, (char*)message, -1, &wmessage[0], euckr_size);
-                    //
-                    // // UTF-16 → UTF-8 변환 (대체 방식)
-                    // int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), -1, nullptr, 0, nullptr, nullptr);
-                    // std::string utf8_message(utf8_size, 0);
-                    // WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), -1, &utf8_message[0], utf8_size, nullptr, nullptr);
-                    
+                       SQLLEN messageLen;
+                       SQLGetData(mHstmt, 4, SQL_C_CHAR, message, sizeof(message), &messageLen);//SQL_C_CHAR
 
+                       SQLGetData(mHstmt, 5, SQL_C_TYPE_TIMESTAMP, &timestamp, sizeof(TIMESTAMP_STRUCT), NULL);
+
+                       // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비)
+                       std::string convertedMessage(reinterpret_cast<char*>(message), messageLen);
+
+                       std::tm timeinfo = { timestamp.second, timestamp.minute, timestamp.hour, timestamp.day, timestamp.month - 1, timestamp.year - 1900 };
+
+                       std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
+                       std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
                        Business::Data_Message messages{
                            id,
                            StringConvert(std::wstring(sender_id)),
                            StringConvert(std::wstring(receiver_id)),
-                           StringConvert(std::wstring(wmessage)),
-                           std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp))//- timestamp 값이 초 단위이면 std::chrono::seconds, 아니라 밀리초(millisecond) 단위
+                           convertedMessage,
+                           utcTime
+                           //std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp))//- timestamp 값이 초 단위이면 std::chrono::seconds, 아니라 밀리초(millisecond) 단위
+
                        };
 
-                    //   std::string jsonData = messages.toJson();
-                    //   redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", messages.sender_id.c_str(), jsonData.c_str());
-                    //   freeReplyObject(reply);
+                      // std::string jsonData = messages.toJson();
+                      // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET Messages:%s %s", messages.id, jsonData.c_str());
+                      // freeReplyObject(reply);
 
-                       std::cout << "안녕하세요! 메시지를 보냅니다." << std::endl;
-                       std::cout << messages.id << std::endl;
-                       std::cout << messages.sender_id << std::endl;
-                       std::cout << messages.receiver_id << std::endl;
-                       std::cout << messages.message << std::endl;
-                       std::cout << messages.timestamp << std::endl;
                    }
                }
                break;
