@@ -1,4 +1,8 @@
 #include "DatabaseWorker.h"  
+#include <iostream>
+#include <string>
+
+
 
 namespace Business  
 {  
@@ -149,9 +153,9 @@ namespace Business
 
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
                    {
-                       SQLGetData(mHstmt, 1, SQL_C_LONG, &id, 0, NULL);
+                       SQLGetData(mHstmt, 1, SQL_C_WCHAR, &id, sizeof(id), NULL);
                        SQLGetData(mHstmt, 2, SQL_C_WCHAR, password, sizeof(password), NULL);
-                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &created_at, 0, NULL);
+                       SQLGetData(mHstmt, 3, SQL_C_SBIGINT, &created_at, sizeof(created_at), NULL);
 
                        Business::Data_User user{
                           StringConvert(std::wstring(id)),
@@ -159,11 +163,13 @@ namespace Business
                           std::chrono::system_clock::time_point(std::chrono::seconds(created_at))
                        };
 
-                       std::string jsonData = user.toJson();
-                       redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
-                       freeReplyObject(reply);
+                    //  std::string jsonData = user.toJson();
+                    //  redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
+                    //  freeReplyObject(reply);
 
                        std::cout << user.id << std::endl;
+                       std::cout << user.password << std::endl;
+                       std::cout << user.created_at << std::endl;
                    }
                }
 
@@ -180,31 +186,49 @@ namespace Business
                {
                    int id;
                    SQLWCHAR sender_id[16];
-                   SQLWCHAR receiver_id[256];
-                   SQLWCHAR message[1024];
+                   SQLWCHAR receiver_id[16];
+                   SQLWCHAR message[2048]; //- SQL_C_WCHAR은 UTF-16을 읽는 방식이므로, 만약 데이터가 UTF-8d이면 깨질수있다.
+                   //SQL_C_WCHAR message[2048];//SQL_C_WCHAR은 UTF-16을 읽는방식.
                    long long timestamp;
 
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
                    {
                        SQLGetData(mHstmt, 1, SQL_C_LONG, &id, 0, NULL);
-                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, sender_id, sizeof(sender_id), NULL);
-                       SQLGetData(mHstmt, 3, SQL_C_WCHAR, receiver_id, sizeof(receiver_id), NULL);
-                       SQLGetData(mHstmt, 4, SQL_C_WCHAR, message, sizeof(message), NULL);
-                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &timestamp, 0, NULL);
+                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, &sender_id, sizeof(sender_id), NULL);
+                       SQLGetData(mHstmt, 3, SQL_C_WCHAR, &receiver_id, sizeof(receiver_id), NULL);
+                       SQLGetData(mHstmt, 4, SQL_C_CHAR, message, sizeof(message), NULL);//SQL_C_CHAR
+                       SQLGetData(mHstmt, 5, SQL_C_SBIGINT, &timestamp, sizeof(timestamp), NULL);
+
+                       // EUC-KR → UTF-8 변환
+                       int euckr_size = MultiByteToWideChar(949, 0, (char*)message, -1, nullptr, 0);
+                       std::wstring wmessage(euckr_size, 0);
+                       MultiByteToWideChar(949, 0, (char*)message, -1, &wmessage[0], euckr_size);
+                    //
+                    // // UTF-16 → UTF-8 변환 (대체 방식)
+                    // int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), -1, nullptr, 0, nullptr, nullptr);
+                    // std::string utf8_message(utf8_size, 0);
+                    // WideCharToMultiByte(CP_UTF8, 0, wmessage.c_str(), -1, &utf8_message[0], utf8_size, nullptr, nullptr);
+                    
+
 
                        Business::Data_Message messages{
                            id,
                            StringConvert(std::wstring(sender_id)),
                            StringConvert(std::wstring(receiver_id)),
-                           StringConvert(std::wstring(message)),
-                           std::chrono::system_clock::time_point(std::chrono::seconds(timestamp))
+                           StringConvert(std::wstring(wmessage)),
+                           std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp))//- timestamp 값이 초 단위이면 std::chrono::seconds, 아니라 밀리초(millisecond) 단위
                        };
 
-                       std::string jsonData = messages.toJson();
-                       redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", messages.sender_id.c_str(), jsonData.c_str());
-                       freeReplyObject(reply);
+                    //   std::string jsonData = messages.toJson();
+                    //   redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", messages.sender_id.c_str(), jsonData.c_str());
+                    //   freeReplyObject(reply);
 
+                       std::cout << "안녕하세요! 메시지를 보냅니다." << std::endl;
+                       std::cout << messages.id << std::endl;
                        std::cout << messages.sender_id << std::endl;
+                       std::cout << messages.receiver_id << std::endl;
+                       std::cout << messages.message << std::endl;
+                       std::cout << messages.timestamp << std::endl;
                    }
                }
                break;
@@ -253,46 +277,3 @@ namespace Business
        return result;
    }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//일단 어떻게 ~던 제가 판
-
- //1. 여자친구랑 지금다니는 회사에서 만났음.
- //2. 여자친구는 디렉터의 성희롱과 데이트강요, 거절하자 괴롭힘 등으로 비자발적 퇴사함, 그로인해 퇴사후에도 정신병원까지 다닐정도로 힘들어했음
- //3. 나는 남자라 디렉터한테 그런 괴롭힘은 받지않았고 당장 대구에 집도구한상태라 퇴사하지않고 계속 일을했음
- //4. 클라이언트 팀장이 진짜 답없어서 클라이언트 팀원들 프로젝트하던것 끝나고 전부퇴사함. 근데 이때 다들 나가니까 나 연봉올려줘서 일단 3개월만 더다니려고했음
- //5. 3개월차에 서버개발자로 보직변경하면서 팀을 바꿔줘서 개인적으로는 도움많이되고 잘 회사 다니는중(연봉도 또 20%정도 올려줄예정이라고 통지받음)
-
- //사건발생
- // 여자친구가 있었던일을 주변지인들에게 말했고, 그러한 사실이 입소문을 타서 최근에 입사한사람통해서 우리회사에 알려지게됨.
- // 디렉터는 그 소문이 전부 거짓이라고 화를 내고 허위사실유포로 고소하니 마니 말이 나오는중.
- // 내가 사귀고있는건 몰라도 회사다닐때 친했던건 알아서, (다른 회사사람들은 전부차단당해서 연락못하기 때문에) 나를통해 연락을 하려고함.
- // 나한테도 막 여자친구 욕을 하고있음. 자기는 잘해줬는데 뒤통수를쳤다느니, 배신자다, 거짓말하고 다닌다고 비방함.
- // 근데 디렉터가 여직원들한테 찝쩍대는건 은연중에 직원들 전부 다알고, 나는 여자친구한테 녹취록이나 카톡기록까지 다봐서 어이가 없음.(참 뻔뻔하네 라는생각?)
-
- // 고민
- // 성준 너였으면, 여자친구가 이런수모를 당하고있는데, 커리어나 금전적으로 이득을 얻기위해서 회사를 더 다닐거같아?

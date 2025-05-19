@@ -15,8 +15,8 @@ namespace Business
 
    struct Data_User
    {  
-       std::string id;  
-       std::string password;  
+       std::string id;  // varchar(16)  
+       std::string password;  // varchar(50)  
        std::chrono::system_clock::time_point created_at; // datetime  
        
        std::string toJson() const {  
@@ -36,8 +36,8 @@ namespace Business
    {  
        int id;  
        std::string sender_id; // varchar(16)  
-       std::string receiver_id;  
-       std::string message;  
+       std::string receiver_id;  // varchar(16)  
+       std::string message;  // text
        std::chrono::system_clock::time_point timestamp; // datetime  
 
        std::string toJson() const {  
