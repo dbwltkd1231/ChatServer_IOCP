@@ -81,6 +81,8 @@ namespace Business
 
    void DatabaseWorker::Deinitalize()  
    {  
+       clearTableCache("Users");
+       clearTableCache("Messages");
        redisFree(mRedis); // 연결 해제
 
        // 연결 종료  
@@ -90,7 +92,7 @@ namespace Business
        SQLFreeHandle(SQL_HANDLE_ENV, mHenv);
    }  
 
-   bool DatabaseWorker::DataLoadAsync(std::string ip, int port)
+   bool DatabaseWorker::DataLoadAndCaching(std::string ip, int port)
    {
        //이코드 실행전 Redis 서버 실행 필요
        mRedis = redisConnect(ip.c_str(), port);
@@ -157,17 +159,16 @@ namespace Business
                        SQLGetData(mHstmt, 2, SQL_C_WCHAR, password, sizeof(password), NULL);
                        SQLGetData(mHstmt, 3, SQL_C_TYPE_TIMESTAMP, &created_at, sizeof(TIMESTAMP_STRUCT), NULL);
 
-
                        std::tm timeinfo = { created_at.second, created_at.minute, created_at.hour, created_at.day, created_at.month - 1, created_at.year - 1900 };
 
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
-                       Business::Data_User user{
-                          StringConvert(std::wstring(id)),
-                          StringConvert(std::wstring(password)),
-                          utcTime
+                       nlohmann::json usersJson = {
+                     {"id", std::wstring(id)}, {"password", std::wstring(password)}, {"created_at", utcTime}
                        };
+
+                       SetCachedData("Users", StringConvert(std::wstring(id)), usersJson, 60);
 
                       // std::string jsonData = user.toJson();
                       // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
@@ -213,15 +214,11 @@ namespace Business
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
-                       Business::Data_Message messages{
-                           id,
-                           StringConvert(std::wstring(sender_id)),
-                           StringConvert(std::wstring(receiver_id)),
-                           convertedMessage,
-                           utcTime
-                           //std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp))//- timestamp 값이 초 단위이면 std::chrono::seconds, 아니라 밀리초(millisecond) 단위
-
+                       nlohmann::json messagesJson = {
+                           {"id", id}, {"receiver_id", receiver_id}, {"sender_id", sender_id}, {"message",convertEUC_KRtoUTF8(convertedMessage)}, {"timestamp",utcTime}
                        };
+
+                       SetCachedData("Messages", std::to_string(id), messagesJson, 60);
 
                       // std::string jsonData = messages.toJson();
                       // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET Messages:%s %s", messages.id, jsonData.c_str());
@@ -273,5 +270,96 @@ namespace Business
        std::string result = std::string(ws.begin(), ws.end());;
 
        return result;
+   }
+
+   void DatabaseWorker::SetCachedData(const std::string table, const std::string key, const nlohmann::json jsonData, int ttl)
+   {
+       std::string cacheKey = "table:" + table + ":" + key;
+
+       for (auto& [field, value] : jsonData.items()) {
+           std::string fieldValue;
+
+           // 문자열 데이터는 그대로 저장 (dump() 사용 X)
+           if (value.is_string()) {
+               fieldValue = value.get<std::string>();
+           }
+           else
+           {
+               fieldValue = value.dump(); // JSON 객체나 숫자는 직렬화하여 저장
+           }
+
+           redisReply* reply = (redisReply*)redisCommand(mRedis, "HSET %s %s %s", cacheKey.c_str(), field.c_str(), fieldValue.c_str());
+           if (reply == NULL) {
+               std::cout << " Redis 저장 오류!" << std::endl;
+               return;
+           }
+           freeReplyObject(reply);
+       }
+
+       redisCommand(mRedis, "EXPIRE %s %d", cacheKey.c_str(), ttl);
+       std::cout << "저장 완료: " << cacheKey << std::endl;
+   }
+
+   void DatabaseWorker::clearTableCache(const std::string table) 
+   {
+       std::string cacheKey = "table:" + table;
+
+       redisReply* reply = (redisReply*)redisCommand(mRedis, "DEL %s", cacheKey.c_str());
+       if (reply == NULL) {
+           std::cout << "Redis 삭제 오류!" << std::endl;
+           return;
+       }
+
+       std::cout << "초기화 완료: " << cacheKey << " 삭제됨!" << std::endl;
+       freeReplyObject(reply);
+   }
+
+
+   std::string DatabaseWorker::convertEUC_KRtoUTF8(const std::string& euc_kr_str)
+   {
+       // EUC-KR → WideChar 변환
+       int wide_size = MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, nullptr, 0);
+       std::wstring wide_str(wide_size, 0);
+       MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, &wide_str[0], wide_size);
+
+       // WideChar → UTF-8 변환
+       int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+       std::string utf8_str(utf8_size, 0);
+       WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, &utf8_str[0], utf8_size, nullptr, nullptr);
+
+       return utf8_str;
+   }
+
+   bool DatabaseWorker::IsKeyExists(const std::string table, const std::string key) {
+       
+       std::string cacheKey = table + ":" + key;
+       redisReply* reply = (redisReply*)redisCommand(mRedis, "EXISTS %s", cacheKey.c_str());
+       if (reply == NULL) {
+           std::cout << "Redis 확인 오류!" << std::endl;
+           return false;
+       }
+
+       bool exists = reply->integer == 1;
+       freeReplyObject(reply);
+       return exists;
+   }
+
+   std::string DatabaseWorker::GetCachedData(const std::string table, const std::string key)
+   {
+       std::string cacheKey = "table:" + table + ":" + key;
+
+       redisReply* reply = (redisReply*)redisCommand(mRedis, "HGETALL %s", cacheKey.c_str());
+       if (reply == NULL || reply->type == REDIS_REPLY_NIL) {
+           std::cout << "Redis에 데이터 없음!" << std::endl;
+           return "";
+       }
+
+       nlohmann::json jsonData;
+       for (size_t i = 0; i < reply->elements; i += 2) {
+           jsonData[reply->element[i]->str] = reply->element[i + 1]->str;
+       }
+
+       freeReplyObject(reply);
+       return jsonData.dump();
    }
 }

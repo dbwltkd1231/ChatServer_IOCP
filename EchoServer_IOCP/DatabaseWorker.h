@@ -20,7 +20,9 @@ namespace Business
 
 		void Initalize();
 		void Deinitalize();
-		bool DataLoadAsync(std::string ip, int port);
+		bool DataLoadAndCaching(std::string ip, int port);
+		std::string GetCachedData(const std::string table, const std::string key);
+
 		TableType getTableType(const std::string& table);
 		std::string StringConvert(std::wstring ws);
 	private:
@@ -31,6 +33,11 @@ namespace Business
 
 		std::set<std::string> mTableNameSet;
 		std::unordered_map<std::string, TableType> mTableMap;
+		void SetCachedData(const std::string table, const std::string key, const nlohmann::json jsonData, int ttl);
+		bool IsKeyExists(const std::string table, const std::string key);
+
+		void clearTableCache(const std::string table);
+		std::string convertEUC_KRtoUTF8(const std::string& euc_kr_str);
 
 	};
 
