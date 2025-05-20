@@ -54,9 +54,9 @@ namespace Business
 		else
 		{
 			Data_User user(chachingData_User);
-			std::cout << user.id << std::endl;
-			std::cout << user.password << std::endl;
-			std::cout << user.created_at << std::endl;
+			std::cout << user.mId << std::endl;
+			std::cout << user.mPassword << std::endl;
+			std::cout << user.mCreated_at << std::endl;
 		}
 
 		auto chachingData_Message = mDatabaseWorker.GetCachedData("Messages", "1");
@@ -68,11 +68,11 @@ namespace Business
 		{
 			Data_Message message(chachingData_Message);
 
-			std::cout << message.id << std::endl;
-			std::cout << message.sender_id << std::endl;
-			std::cout << message.receiver_id << std::endl;
-			std::cout << message.message << std::endl;
-			std::cout << message.timestamp << std::endl;
+			std::cout << message.mId << std::endl;
+			std::cout << message.mSender_id << std::endl;
+			std::cout << message.mReceiver_id << std::endl;
+			std::cout << message.mMessage << std::endl;
+			std::cout << message.mTimestamp << std::endl;
 		}
 
 		auto receiveCallback = std::function<void(std::shared_ptr<IOCP::CustomOverlapped>)>(

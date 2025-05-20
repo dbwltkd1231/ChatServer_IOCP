@@ -24,7 +24,6 @@ namespace Business
 		nlohmann::json GetCachedData(const std::string table, const std::string key);
 
 		TableType getTableType(const std::string& table);
-		std::string StringConvert(std::wstring ws);
 	private:
 		SQLHENV mHenv;
 		SQLHDBC mHdbc;
@@ -33,13 +32,10 @@ namespace Business
 
 		std::set<std::string> mTableNameSet;
 		std::unordered_map<std::string, TableType> mTableMap;
+
 		void SetCachedData(const std::string table, const std::string key, std::string jsonString, int ttl);
 		bool IsKeyExists(const std::string table, const std::string key);
-
 		void clearTableCache(const std::string table);
-		std::string convertEUC_KRtoUTF8(const std::string& euc_kr_str);
-		std::string wstringToUTF8(const std::wstring& wstr);
-
 	};
 
 

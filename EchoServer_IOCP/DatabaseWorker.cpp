@@ -115,8 +115,8 @@ namespace Business
            while (SQLFetch(mHstmt) == SQL_SUCCESS) {
                SQLGetData(mHstmt, 1, SQL_C_WCHAR, tableName, sizeof(tableName), NULL);
 
-               std::cout << "TableName : " << StringConvert(std::wstring(tableName)) << std::endl;
-               mTableNameSet.insert(StringConvert(std::wstring(tableName)));
+               std::cout << "TableName : " << Business::Utility::StringConvert(std::wstring(tableName)) << std::endl;
+               mTableNameSet.insert(Business::Utility::StringConvert(std::wstring(tableName)));
            }
        }
        else
@@ -164,13 +164,9 @@ namespace Business
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
-                       nlohmann::json usersJson = {
-                           {"id", wstringToUTF8(id)},
-                           {"password", wstringToUTF8(password)},
-                           {"created_at", utcTime}
-                       };
+					   auto usersJson = Data_User::toJson(Business::Utility::WstringToUTF8(id), Business::Utility::WstringToUTF8(password), utcTime);
                        std::string jsonString = usersJson.dump(); // JSON을 문자열로 변환
-                       SetCachedData(table, wstringToUTF8(id), jsonString, 60); // 60초 TTL 설정);
+                       SetCachedData(table, Business::Utility::WstringToUTF8(id), jsonString, 60); // 60초 TTL 설정);
 
                    }
                }
@@ -207,14 +203,14 @@ namespace Business
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
                     
-                       std::string convertedMessage = convertEUC_KRtoUTF8(std::string(reinterpret_cast<char*>(message), messageLen));   
+                       std::string convertedMessage = Business::Utility::ConvertEUC_KRtoUTF8(std::string(reinterpret_cast<char*>(message), messageLen));
                        // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비),
                        //nlohmann::json 라이브러리는 내부적으로 UTF-8 인코딩을 강제
 
                        nlohmann::json messagesJson = {
                            {"id", id},
-                           {"receiver_id", wstringToUTF8(receiver_id)},
-                           {"sender_id", wstringToUTF8(sender_id)},
+                           {"receiver_id", Business::Utility::WstringToUTF8(receiver_id)},
+                           {"sender_id", Business::Utility::WstringToUTF8(sender_id)},
                            {"message", convertedMessage},
                            {"timestamp", utcTime}
                        };
@@ -229,27 +225,6 @@ namespace Business
            }
 
            SQLFreeStmt(mHstmt, SQL_CLOSE); // 이전 쿼리 결과 닫기
-
-           /*
-           std::wstring queryStr = L"SELECT COLUMN_NAME, DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME = '" + std::wstring(table.begin(), table.end()) + L"'";
-
-           SQLWCHAR* columnsQuery = (SQLWCHAR*)queryStr.c_str();
-           SQLRETURN colRet = SQLExecDirectW(mHstmt, columnsQuery, SQL_NTS);
-           if (colRet == SQL_SUCCESS || colRet == SQL_SUCCESS_WITH_INFO) {
-               SQLWCHAR columnName[256], dataType[256];
-               while (SQLFetch(mHstmt) == SQL_SUCCESS)
-               {
-                   SQLGetData(mHstmt, 1, SQL_C_WCHAR, columnName, sizeof(columnName), NULL);
-                   SQLGetData(mHstmt, 2, SQL_C_WCHAR, dataType, sizeof(dataType), NULL);
-
-                   std::cout << "칼럼 이름 : " << StringConvert(std::wstring(columnName)) << ", 데이터 타입: " << StringConvert(std::wstring(dataType)) << std::endl;
-               }
-           }
-           else
-           {
-               std::cout << table << " 정보 가져오기 실패";
-           }
-           */
        }
 
        return true;
@@ -261,17 +236,10 @@ namespace Business
        return (it != mTableMap.end()) ? it->second : TableType::Unknown;
    }
 
-   std::string DatabaseWorker::StringConvert(std::wstring ws)
-   {
-       std::string result = std::string(ws.begin(), ws.end());;
-
-       return result;
-   }
 
    void DatabaseWorker::SetCachedData(const std::string table, const std::string key, std::string jsonString, int ttl)
    {
        std::string cacheKey = "table:" + table + ":" + key;
-       //std::string jsonString = messagesJson.dump(); // JSON을 직렬화
        redisReply* reply = (redisReply*)redisCommand(mRedis, "SET %s %s EX %d", cacheKey.c_str(), jsonString.c_str(), ttl);
    }
 
@@ -287,32 +255,6 @@ namespace Business
 
        std::cout << "초기화 완료: " << cacheKey << " 삭제됨!" << std::endl;
        freeReplyObject(reply);
-   }
-
-
-   std::string DatabaseWorker::convertEUC_KRtoUTF8(const std::string& euc_kr_str)
-   {
-       // EUC-KR → WideChar 변환
-       int wide_size = MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, nullptr, 0);
-       std::wstring wide_str(wide_size, 0);
-       MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, &wide_str[0], wide_size);
-
-       // WideChar → UTF-8 변환
-       int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, nullptr, 0, nullptr, nullptr);
-       std::string utf8_str(utf8_size, 0);
-       WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, &utf8_str[0], utf8_size, nullptr, nullptr);
-
-       return utf8_str;
-   }
-
-   std::string DatabaseWorker::wstringToUTF8(const std::wstring& wstr) {
-       if (wstr.empty()) return std::string();
-
-       int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), NULL, 0, NULL, NULL);
-       std::string strTo(sizeNeeded, 0);
-       WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), &strTo[0], sizeNeeded, NULL, NULL);
-
-       return strTo;
    }
 
    bool DatabaseWorker::IsKeyExists(const std::string table, const std::string key) {
