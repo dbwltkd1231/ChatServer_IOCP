@@ -57,7 +57,7 @@ namespace Business
            mTimestamp = jsonStr["timestamp"];
        }
 
-       nlohmann::json static toJson(int id, std::string sender_id, std::time_t receiver_id, std::string message, std::time_t timestamp)
+       nlohmann::json static toJson(int id, std::string sender_id, std::string receiver_id, std::string message, std::time_t timestamp)
        {
 		   nlohmann::json messagesJson =
 		   {

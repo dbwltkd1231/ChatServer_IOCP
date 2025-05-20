@@ -62,7 +62,7 @@ namespace Business
 		auto chachingData_Message = mDatabaseWorker.GetCachedData("Messages", "1");
 		if (chachingData_Message == "")
 		{
-			std::cout << "1 Messages 데이터 없음" << std::endl;
+			std::cout << "1 SystemMessages 데이터 없음" << std::endl;
 		}
 		else
 		{
@@ -118,13 +118,6 @@ namespace Business
 		}
 
 		auto client = (*network.mClientMap)[socket_id];
-
-		//auto verifier = flatbuffers::Verifier(reinterpret_cast<const uint8_t*>(overlapped->wsabuf[1].buf), request_body_size); // 버퍼와 크기를 사용하여 Verifier 객체 생성
-		//if (verifier.Check(false))
-		//{
-		//	std::cout << "Message FIlter verifier check false" << std::endl;
-		//	return;
-		//}
 
 		switch (messageType)
 		{

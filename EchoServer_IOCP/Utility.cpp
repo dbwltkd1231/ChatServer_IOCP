@@ -1,4 +1,5 @@
 #include "Utility.h"  
+#include <iostream>
 
 namespace Business
 {
@@ -8,11 +9,24 @@ namespace Business
     {
         // EUC-KR → WideChar 변환
         int wide_size = MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, nullptr, 0);
+        if(wide_size == 0)
+        {
+            // 변환 실패
+            return std::string();
+        }
+
         std::wstring wide_str(wide_size, 0);
         MultiByteToWideChar(949, 0, euc_kr_str.c_str(), -1, &wide_str[0], wide_size);
 
+        std::cout << std::endl;
+
         // WideChar → UTF-8 변환
         int utf8_size = WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, nullptr, 0, nullptr, nullptr);
+		if (utf8_size == 0)
+		{
+			// 변환 실패
+			return std::string();
+		}
         std::string utf8_str(utf8_size, 0);
         WideCharToMultiByte(CP_UTF8, 0, wide_str.c_str(), -1, &utf8_str[0], utf8_size, nullptr, nullptr);
 

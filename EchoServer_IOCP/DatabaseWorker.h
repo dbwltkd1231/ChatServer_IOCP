@@ -21,6 +21,8 @@ namespace Business
 		void Initalize();
 		void Deinitalize();
 		bool DataLoadAndCaching(std::string ip, int port);
+		void DataInput(const std::string table, const std::string key);
+
 		nlohmann::json GetCachedData(const std::string table, const std::string key);
 
 		TableType getTableType(const std::string& table);

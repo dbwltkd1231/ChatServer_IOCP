@@ -128,7 +128,6 @@ namespace Business
  
        for (auto table : mTableNameSet)
        {
-   
            SQLFreeStmt(mHstmt, SQL_CLOSE); // 이전 쿼리 결과 닫기
            auto tableType = getTableType(table);
 
@@ -156,7 +155,7 @@ namespace Business
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
                    {
                        SQLGetData(mHstmt, 1, SQL_C_WCHAR, &id, sizeof(id), NULL);
-                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, password, sizeof(password), NULL);
+                       SQLGetData(mHstmt, 2, SQL_C_WCHAR, &password, sizeof(password), NULL);
                        SQLGetData(mHstmt, 3, SQL_C_TYPE_TIMESTAMP, &created_at, sizeof(TIMESTAMP_STRUCT), NULL);
 
                        std::tm timeinfo = { created_at.second, created_at.minute, created_at.hour, created_at.day, created_at.month - 1, created_at.year - 1900 };
@@ -166,8 +165,8 @@ namespace Business
 
 					   auto usersJson = Data_User::toJson(Business::Utility::WstringToUTF8(id), Business::Utility::WstringToUTF8(password), utcTime);
                        std::string jsonString = usersJson.dump(); // JSON을 문자열로 변환
-                       SetCachedData(table, Business::Utility::WstringToUTF8(id), jsonString, 60); // 60초 TTL 설정);
 
+                       SetCachedData(table, Business::Utility::WstringToUTF8(id), jsonString, 60); // 60초 TTL 설정);
                    }
                }
 
@@ -175,7 +174,7 @@ namespace Business
            }
            case TableType::Messages:
            {
-               std::cout << "Messages" << std::endl;
+               std::cout << "SystemMessages" << std::endl;
                std::wstring queryStr = L"SELECT id, sender_id, receiver_id, message, timestamp FROM " + std::wstring(table.begin(), table.end());
                SQLWCHAR* dataQuery = (SQLWCHAR*)queryStr.c_str();
 
@@ -185,8 +184,7 @@ namespace Business
                    int id;
                    SQLWCHAR sender_id[16];
                    SQLWCHAR receiver_id[16];
-                   //SQLWCHAR message[2048]; //- SQL_C_WCHAR은 UTF-16을 읽는 방식이므로, 만약 데이터가 UTF-8d이면 깨질수있다.
-                   SQLCHAR message[2048];//SQL_C_WCHAR은 UTF-16을 읽는방식.
+                   SQLCHAR message[2048];//SQL_C_WCHAR은 UTF-16을 읽는방식.  SQL_C_WCHAR은 UTF-16을 읽는 방식이므로, 만약 데이터가 UTF-8d이면 깨질수있다.
                    TIMESTAMP_STRUCT timestamp;
 
                    while (SQLFetch(mHstmt) == SQL_SUCCESS)
@@ -196,26 +194,23 @@ namespace Business
                        SQLGetData(mHstmt, 3, SQL_C_WCHAR, &receiver_id, sizeof(receiver_id), NULL);
 
                        SQLLEN messageLen;
-                       SQLGetData(mHstmt, 4, SQL_C_CHAR, message, sizeof(message), &messageLen);//SQL_C_CHAR
+                       SQLGetData(mHstmt, 4, SQL_C_CHAR, &message, sizeof(message), &messageLen);//SQL_C_CHAR
                        SQLGetData(mHstmt, 5, SQL_C_TYPE_TIMESTAMP, &timestamp, sizeof(TIMESTAMP_STRUCT), NULL);
 
                        std::tm timeinfo = { timestamp.second, timestamp.minute, timestamp.hour, timestamp.day, timestamp.month - 1, timestamp.year - 1900 };
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
-                    
+
                        std::string convertedMessage = Business::Utility::ConvertEUC_KRtoUTF8(std::string(reinterpret_cast<char*>(message), messageLen));
-                       // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비),
+
+                       // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비),    0
+                       // 
                        //nlohmann::json 라이브러리는 내부적으로 UTF-8 인코딩을 강제
 
-                       nlohmann::json messagesJson = {
-                           {"id", id},
-                           {"receiver_id", Business::Utility::WstringToUTF8(receiver_id)},
-                           {"sender_id", Business::Utility::WstringToUTF8(sender_id)},
-                           {"message", convertedMessage},
-                           {"timestamp", utcTime}
-                       };
+                       auto messagesJson = Data_Message::toJson(id, Business::Utility::WstringToUTF8(sender_id), Business::Utility::WstringToUTF8(receiver_id), Business::Utility::ConvertEUC_KRtoUTF8(std::string(reinterpret_cast<char*>(message), messageLen)), utcTime);
                        std::string jsonString = messagesJson.dump(); // JSON을 문자열로 변환
-					   SetCachedData(table, std::to_string(id), jsonString, 60); // 60초 TTL 설정);
+
+                       SetCachedData(table, std::to_string(id), jsonString, 60); // 60초 TTL 설정);
                    }
                }
                break;
@@ -273,7 +268,6 @@ namespace Business
 
    nlohmann::json DatabaseWorker::GetCachedData(const std::string table, const std::string key)
    {
-
        std::string cacheKey = "table:" + table + ":" + key;
 
        redisReply* reply = (redisReply*)redisCommand(mRedis, "GET %s", cacheKey.c_str());
@@ -285,6 +279,7 @@ namespace Business
            return parsedJson;
        }
 
-	   return ""; // 데이터가 없거나 오류 발생 시 빈 문자열 반환
+       std::cerr << " 데이터가 없거나 오류 발생 " << std::endl;
+	   return ""; 
    }
 }
