@@ -21,35 +21,11 @@ namespace Business
 
 
        //  JSON 문자열을 파싱하여 구조체 멤버 변수 초기화
-       Data_User(const std::string& jsonStr) 
+       Data_User(const nlohmann::json& jsonStr)
        {
-           try
-           {
-               nlohmann::json jsonData = nlohmann::json::parse(jsonStr);
-
-               auto array = jsonData.value("id", "");
-			   for (auto& item : array)
-			   {
-				   std::cout << static_cast<char>(item) << std::endl;
-			   }
-               id = jsonData.value("id", "");
-			   password = jsonData.value("password", "");
-
-               if (jsonData["created_at"].is_string()) 
-               {
-                   created_at = std::stoll(jsonData["created_at"].get<std::string>()); // 문자열 → 숫자로 변환
-               }
-               else
-               {
-                   created_at = jsonData.value("created_at", 0LL); // 숫자로 저장된 경우 그대로 사용
-               }
-
-
-           }
-           catch (const std::exception& e) {
-               std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
-           }
-
+           id = jsonStr["id"];
+           password = jsonStr["password"];
+           created_at = jsonStr["created_at"];
        }
 
        std::string toJson() const {  
@@ -71,25 +47,28 @@ namespace Business
        std::string sender_id; // varchar(16)  
        std::string receiver_id;  // varchar(16)  
        std::string message;  // text
-       //std::ostringstream timestamp; // SQL의 datetime형식 ->  TIMESTAMP_STRUCT 구조체로 변환해서 사용-> json형태로 저장하기 위해 ISO 8601 형식 문자열로 변환 후 저장
        long long timestamp; // SQL의 datetime형식 ->  TIMESTAMP_STRUCT 구조체로 변환해서 사용-> json형태로 저장하기 위해 ISO 8601 형식 문자열로 변환 후 저장
   
-       Data_Message(std::string jsonStr)
+       Data_Message(const nlohmann::json jsonStr)
        {
-           // JSON 문자열을 파싱하여 구조체 멤버 변수 초기화
-           try {
-               nlohmann::json jsonData = nlohmann::json::parse(jsonStr);
+           id = jsonStr["id"];
+           sender_id = jsonStr["sender_id"];
+           receiver_id = jsonStr["receiver_id"];
 
-               id = jsonData.value("id", 0);
-               sender_id = jsonData.value("sender_id", "");
-               receiver_id = jsonData.value("receiver_id", "");
-               message = jsonData.value("message", "");
-			   timestamp = jsonData.value("timestamp", 0);
+           std::string utf8_message = jsonStr["message"];
 
-           }
-           catch (const std::exception& e) {
-               std::cerr << "JSON 파싱 오류: " << e.what() << std::endl;
-           }
+           // UTF-8 → WideChar (Unicode)
+           int wideSize = MultiByteToWideChar(CP_UTF8, 0, utf8_message.c_str(), -1, NULL, 0);
+           std::wstring wideStr(wideSize, 0);
+           MultiByteToWideChar(CP_UTF8, 0, utf8_message.c_str(), -1, &wideStr[0], wideSize);
+
+           // WideChar → EUC-KR
+           int eucSize = WideCharToMultiByte(949 /*EUC-KR 코드 페이지*/, 0, wideStr.c_str(), -1, NULL, 0, NULL, NULL);
+           std::string euc_message(eucSize, 0);
+           WideCharToMultiByte(949, 0, wideStr.c_str(), -1, &euc_message[0], eucSize, NULL, NULL);
+           message = euc_message;
+
+           timestamp = jsonStr["timestamp"];
        }
   
    };  

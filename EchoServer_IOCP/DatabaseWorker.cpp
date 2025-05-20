@@ -165,14 +165,12 @@ namespace Business
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
 
                        nlohmann::json usersJson = {
-                     {"id", std::wstring(id)}, {"password", std::wstring(password)}, {"created_at", utcTime}
+                           {"id", wstringToUTF8(id)},
+                           {"password", wstringToUTF8(password)},
+                           {"created_at", utcTime}
                        };
-
-                       SetCachedData("Users", StringConvert(std::wstring(id)), usersJson, 60);
-
-                      // std::string jsonData = user.toJson();
-                      // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET User:%s %s", user.id.c_str(), jsonData.c_str());
-                      // freeReplyObject(reply);
+                       std::string jsonString = usersJson.dump(); // JSON을 문자열로 변환
+                       SetCachedData(table, wstringToUTF8(id), jsonString, 60); // 60초 TTL 설정);
 
                    }
                }
@@ -203,27 +201,25 @@ namespace Business
 
                        SQLLEN messageLen;
                        SQLGetData(mHstmt, 4, SQL_C_CHAR, message, sizeof(message), &messageLen);//SQL_C_CHAR
-
                        SQLGetData(mHstmt, 5, SQL_C_TYPE_TIMESTAMP, &timestamp, sizeof(TIMESTAMP_STRUCT), NULL);
 
-                       // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비)
-                       std::string convertedMessage(reinterpret_cast<char*>(message), messageLen);
-
                        std::tm timeinfo = { timestamp.second, timestamp.minute, timestamp.hour, timestamp.day, timestamp.month - 1, timestamp.year - 1900 };
-
                        std::time_t localTime = std::mktime(&timeinfo); // 로컬 시간 변환
                        std::time_t utcTime = _mkgmtime(&timeinfo); // UTC 기준으로 변환
+                    
+                       std::string convertedMessage = convertEUC_KRtoUTF8(std::string(reinterpret_cast<char*>(message), messageLen));   
+                       // 정확한 길이만큼 변환 (NULL 종료 포함되지 않는 경우 대비),
+                       //nlohmann::json 라이브러리는 내부적으로 UTF-8 인코딩을 강제
 
                        nlohmann::json messagesJson = {
-                           {"id", id}, {"receiver_id", receiver_id}, {"sender_id", sender_id}, {"message",convertEUC_KRtoUTF8(convertedMessage)}, {"timestamp",utcTime}
+                           {"id", id},
+                           {"receiver_id", wstringToUTF8(receiver_id)},
+                           {"sender_id", wstringToUTF8(sender_id)},
+                           {"message", convertedMessage},
+                           {"timestamp", utcTime}
                        };
-
-                       SetCachedData("Messages", std::to_string(id), messagesJson, 60);
-
-                      // std::string jsonData = messages.toJson();
-                      // redisReply* reply = (redisReply*)redisCommand(mRedis, "SET Messages:%s %s", messages.id, jsonData.c_str());
-                      // freeReplyObject(reply);
-
+                       std::string jsonString = messagesJson.dump(); // JSON을 문자열로 변환
+					   SetCachedData(table, std::to_string(id), jsonString, 60); // 60초 TTL 설정);
                    }
                }
                break;
@@ -272,32 +268,11 @@ namespace Business
        return result;
    }
 
-   void DatabaseWorker::SetCachedData(const std::string table, const std::string key, const nlohmann::json jsonData, int ttl)
+   void DatabaseWorker::SetCachedData(const std::string table, const std::string key, std::string jsonString, int ttl)
    {
        std::string cacheKey = "table:" + table + ":" + key;
-
-       for (auto& [field, value] : jsonData.items()) {
-           std::string fieldValue;
-
-           // 문자열 데이터는 그대로 저장 (dump() 사용 X)
-           if (value.is_string()) {
-               fieldValue = value.get<std::string>();
-           }
-           else
-           {
-               fieldValue = value.dump(); // JSON 객체나 숫자는 직렬화하여 저장
-           }
-
-           redisReply* reply = (redisReply*)redisCommand(mRedis, "HSET %s %s %s", cacheKey.c_str(), field.c_str(), fieldValue.c_str());
-           if (reply == NULL) {
-               std::cout << " Redis 저장 오류!" << std::endl;
-               return;
-           }
-           freeReplyObject(reply);
-       }
-
-       redisCommand(mRedis, "EXPIRE %s %d", cacheKey.c_str(), ttl);
-       std::cout << "저장 완료: " << cacheKey << std::endl;
+       //std::string jsonString = messagesJson.dump(); // JSON을 직렬화
+       redisReply* reply = (redisReply*)redisCommand(mRedis, "SET %s %s EX %d", cacheKey.c_str(), jsonString.c_str(), ttl);
    }
 
    void DatabaseWorker::clearTableCache(const std::string table) 
@@ -330,6 +305,16 @@ namespace Business
        return utf8_str;
    }
 
+   std::string DatabaseWorker::wstringToUTF8(const std::wstring& wstr) {
+       if (wstr.empty()) return std::string();
+
+       int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), NULL, 0, NULL, NULL);
+       std::string strTo(sizeNeeded, 0);
+       WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), (int)wstr.length(), &strTo[0], sizeNeeded, NULL, NULL);
+
+       return strTo;
+   }
+
    bool DatabaseWorker::IsKeyExists(const std::string table, const std::string key) {
        
        std::string cacheKey = table + ":" + key;
@@ -344,22 +329,20 @@ namespace Business
        return exists;
    }
 
-   std::string DatabaseWorker::GetCachedData(const std::string table, const std::string key)
+   nlohmann::json DatabaseWorker::GetCachedData(const std::string table, const std::string key)
    {
+
        std::string cacheKey = "table:" + table + ":" + key;
 
-       redisReply* reply = (redisReply*)redisCommand(mRedis, "HGETALL %s", cacheKey.c_str());
-       if (reply == NULL || reply->type == REDIS_REPLY_NIL) {
-           std::cout << "Redis에 데이터 없음!" << std::endl;
-           return "";
+       redisReply* reply = (redisReply*)redisCommand(mRedis, "GET %s", cacheKey.c_str());
+       if (reply != NULL && reply->type == REDIS_REPLY_STRING)
+       {
+           std::string jsonString = reply->str;
+           nlohmann::json parsedJson = nlohmann::json::parse(jsonString);
+           freeReplyObject(reply);
+           return parsedJson;
        }
 
-       nlohmann::json jsonData;
-       for (size_t i = 0; i < reply->elements; i += 2) {
-           jsonData[reply->element[i]->str] = reply->element[i + 1]->str;
-       }
-
-       freeReplyObject(reply);
-       return jsonData.dump();
+	   return ""; // 데이터가 없거나 오류 발생 시 빈 문자열 반환
    }
 }

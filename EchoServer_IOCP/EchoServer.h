@@ -46,35 +46,34 @@ namespace Business
 		mDatabaseWorker.Initalize();
 		mDatabaseWorker.DataLoadAndCaching(ip, redisPortNum);
 
-		std::string chachingData_User = mDatabaseWorker.GetCachedData("Users", "user1234");
+		auto chachingData_User = mDatabaseWorker.GetCachedData("Users", "user1234");
 		if (chachingData_User == "")
 		{
 			std::cout << "user1234 User 데이터 없음" << std::endl;
 		}
 		else
 		{
-			
 			Data_User user(chachingData_User);
 			std::cout << user.id << std::endl;
 			std::cout << user.password << std::endl;
 			std::cout << user.created_at << std::endl;
 		}
 
-	//std::string chachingData_Message = mDatabaseWorker.GetCachedData("Messages", "1");
-	//if (chachingData_Message == "")
-	//{
-	//	std::cout << "1 Messages 데이터 없음" << std::endl;
-	//}
-	//else
-	//{
-	//	Data_Message message(chachingData_Message);
-	//
-	//	std::cout << message.id << std::endl;
-	//	std::cout << message.sender_id << std::endl;
-	//	std::cout << message.receiver_id << std::endl;
-	//	std::cout << message.message << std::endl;
-	//	std::cout << message.timestamp << std::endl;
-	//}
+		auto chachingData_Message = mDatabaseWorker.GetCachedData("Messages", "1");
+		if (chachingData_Message == "")
+		{
+			std::cout << "1 Messages 데이터 없음" << std::endl;
+		}
+		else
+		{
+			Data_Message message(chachingData_Message);
+
+			std::cout << message.id << std::endl;
+			std::cout << message.sender_id << std::endl;
+			std::cout << message.receiver_id << std::endl;
+			std::cout << message.message << std::endl;
+			std::cout << message.timestamp << std::endl;
+		}
 
 		auto receiveCallback = std::function<void(std::shared_ptr<IOCP::CustomOverlapped>)>(
 			std::bind(&ChatServer::Read, this, std::placeholders::_1)
