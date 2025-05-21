@@ -5,8 +5,8 @@ namespace Business
 {  
     enum class TableType 
     { 
-        Messages,
         Users,
+        Messages,
         Unknown 
     };
 

@@ -165,6 +165,7 @@ namespace Business
 			//newOverlap.SetHeader(messageHeader);
 			//newOverlap.SetBody(message, size);
 
+
 			break;
 		}
 		case protocol::MessageContent_RESPONSE_CONNECT:
@@ -195,9 +196,33 @@ namespace Business
 				return;
 			}
 
-			std::cout << "Request CREATE_ACCOUNT -> ID: " << message_wrapper->user_id()->str() << " Password: " << message_wrapper->password()->str() << std::endl;
+			auto userID = message_wrapper->user_id()->str();
+			auto password = message_wrapper->password()->str();
+			std::cout << "Request CREATE_ACCOUNT -> ID: " << userID << " Password: " << password << std::endl;
 
-			auto builder = Create_Response_Create_Account(message_wrapper->user_id()->str(), message_wrapper->password()->str());
+
+			///////
+
+			bool isCreateAccountSuccess = mDatabaseWorker.GetCachedData("Users", userID) == "";
+
+			if (isCreateAccountSuccess)
+			{
+				std::time_t currentUtcTime = std::time(nullptr);
+
+				auto messagesJson = Data_User::toJson(userID, password, currentUtcTime);
+				std::string jsonString = messagesJson.dump();
+				mDatabaseWorker.SetCachedData("Users", userID, jsonString, 60);
+				mDatabaseWorker.SaveSQLDatabase("Users");
+			}
+			else
+			{
+				
+			}
+
+			///////
+
+
+			auto builder = Create_Response_Create_Account(message_wrapper->user_id()->str(), isCreateAccountSuccess);
 
 			auto data = builder.GetBufferPointer();
 			auto size = builder.GetSize();

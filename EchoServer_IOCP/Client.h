@@ -120,6 +120,7 @@ namespace IOCP
 		context->operationType = IOCP::OperationType::OP_SEND;
 
 		DWORD flags = 0;
+
 		int result = WSASend(*mClientSocketPtr, context->wsabuf, 2, nullptr, flags, &(*context), nullptr);// 비동기 쓰기 요청
 		if (result == SOCKET_ERROR)
 		{

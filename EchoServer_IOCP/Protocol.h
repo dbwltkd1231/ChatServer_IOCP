@@ -18,11 +18,11 @@ namespace Business
 		;
 	}
 
-	static flatbuffers::FlatBufferBuilder Create_Response_Create_Account(std::string id, std::string password)
+	static flatbuffers::FlatBufferBuilder Create_Response_Create_Account(std::string id, bool success)
 	{
 		flatbuffers::FlatBufferBuilder builder;
 		auto userID = builder.CreateString(id);
-		builder.Finish(protocol::CreateRESPONSE_CREATE_ACCOUNT(builder, userID, true));
+		builder.Finish(protocol::CreateRESPONSE_CREATE_ACCOUNT(builder, userID, success));
 
 		return builder;
 	}
